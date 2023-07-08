@@ -1,11 +1,16 @@
+//Importing required modules
 const express = require("express");
 const mongoose = require("mongoose");
 const parser = require("body-parser");
+require("dotenv").config();
 const _ = require("lodash");
 const date = require(__dirname + "/date.js");
 const { getLocaleDAte } = require("./date");
 const app = express();
-mongoose.connect("mongodb+srv://admin-prashant:Prash%401237387614381@cluster0.vogammm.mongodb.net/todoDB");
+//connecting to the mongodb cloud
+var uri = process.env.URL;
+mongoose.connect(uri);
+//Defining the schema of simple todo
 const todoSchema = mongoose.Schema({
   todo: {
     type: String,
@@ -16,14 +21,21 @@ const todoSchema = mongoose.Schema({
     default: false,
   },
 });
+
+//Craeting model of schema todoSchema
 const Todo = mongoose.model("Todo", todoSchema);
 
+//Making ejs as default view engine
 app.set("view engine", "ejs");
 app.use(parser.urlencoded({ extended: true }));
+//all static files are stored in public folder
 app.use(express.static("public/"));
-app.listen(3000, () => {
-  console.log("App is live on port 3000!");
+//making App to listen on port decided by process thread
+app.listen(process.env.PORT || 3000, () => {
+  console.log("App is live!");
 });
+
+//Making default todo's to boot start user
 const todo1 = new Todo({
   todo: "Welcome to your todolist!",
   isDone: false,
@@ -37,44 +49,39 @@ const todo3 = new Todo({
   isDone: false,
 });
 const defaultitems = [todo1, todo2, todo3];
+
+//Defining schema of list of different todo's
 const listSchema = mongoose.Schema({
   name: String,
   items: [todoSchema],
 });
+//Creating model of listSchema
 const List = mongoose.model("list", listSchema);
 
+//Inserting default todos in database
 Todo.find().then(function (FoundItems) {
   if (FoundItems.length <= 0) {
     Todo.insertMany(defaultitems);
   }
 });
 
-const workItems = [];
-
+//Currrent day to show on default todo list
 const currentDay = date.getLocaleDate();
-app.get("/", async(req, res) => {
+app.get("/", async (req, res) => {
   const lst = await Todo.find();
-  if(lst.length<=0){
-    await Todo.insertMany(defaultitems);
-    res.redirect("/");
-  }
-  else{
-    res.render("list", { listTitle: currentDay, toDos: lst });
-  }
+  res.render("list", { listTitle: currentDay, toDos: lst });
 });
 
+//Custom todoList will be created on user demand
 app.get("/:customListName", async (req, res) => {
-  const customListName = _.capitalize(req.params.customListName);
-  console.log("------->" + customListName);
+  const customListName = _.capitalize(req.params.customListName);//making use of lodash to avoid ambugity
   const lst = await List.find({ name: customListName });
-  console.log(lst);
-  console.log(lst.length);
   if (lst.length <= 0) {
     const list = new List({
       name: customListName,
       items: defaultitems,
     });
-    if(customListName!='Favicon.ico'){
+    if (customListName != "Favicon.ico") {
       list.save();
     }
     res.redirect("/" + customListName);
@@ -82,6 +89,8 @@ app.get("/:customListName", async (req, res) => {
     res.render("list", { listTitle: customListName, toDos: lst[0].items });
   }
 });
+
+//Adding new todos to particular list 
 app.post("/", async (req1, res1) => {
   const todo = req1.body.toDo;
   const list = req1.body.list;
@@ -99,10 +108,13 @@ app.post("/", async (req1, res1) => {
     res1.redirect("/" + list);
   }
 });
-app.get("/about", async(req, res) => {
+
+// Rendering about page
+app.get("/about", async (req, res) => {
   res.render("about");
 });
 
+//Deleting todo's completed by user
 app.post("/deleteItem", async (req3, res3) => {
   const lstName = req3.body.listName;
   const id = req3.body.isDone;
